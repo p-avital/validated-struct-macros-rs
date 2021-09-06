@@ -1,0 +1,22 @@
+[package]
+name = "validated_struct_macros"
+version = "0.1.0"
+edition = "2018"
+authors = ["Pierre Avital <pierre.avital@me.com>"]
+description = "Macros for validated_struct"
+keywords = ["proc-macros"]
+license = "EPL-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+serde = []
+dot_separator = []
+
+[dependencies]
+proc-macro2 = "1"
+syn = { version = "1", features = ["full"] }
+quote = "1.0.2"
+unzip-n = "0.1.2"
+
+[lib]
+proc-macro = true

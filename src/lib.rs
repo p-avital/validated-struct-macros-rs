@@ -89,30 +89,42 @@ impl StructSpec {
             .iter()
             .map(|f| {
                 let attrs = &f.attributes;
+                let doc_attrs: Vec<_> = attrs.iter().filter(|&attr| attr.path.is_ident("doc")).cloned().collect();
                 let id = &f.ident;
                 let field = id;//quote::format_ident!("_{}", id);
                 let ty = f.ty.ty();
                 let predicate = f
                     .constraint
                     .as_ref()
-                    .map(|e| quote! {#e(&value)})
-                    .unwrap_or(quote! {true});
+                    .map(|e| quote! {#e(&value)});
                 let str_id = format!("{}", id);
                 let serde_set_err = format!("Predicate rejected value for {}", id);
                 let set_id = quote::format_ident!("set_{}", id);
                 let validate_id = quote::format_ident!("validate_{}", id);
                 let validate_id_rec = quote::format_ident!("validate_{}_rec", id);
                 let validate_id_rec_impl = if let FieldType::Structure(_) = f.ty {
-                    quote! {
-                        fn #validate_id_rec(value: &#ty) -> bool {
-                            value.validate_rec() && #predicate
-                        }
+                    match &predicate {
+                        Some(predicate) => quote! {
+                            fn #validate_id_rec(value: &#ty) -> bool {
+                                value.validate_rec() && #predicate
+                            }
+                        },
+                        None => quote! {
+                            fn #validate_id_rec(value: &#ty) -> bool {
+                                value.validate_rec() 
+                            }
+                        },
                     }
+                    
                 } else {
+                    let validate_rec_inner = match predicate {
+                        Some(_) => quote!{Self::#validate_id(value)},
+                        None => quote!{true},
+                    };
                     quote! {
                         #[allow(clippy::ptr_arg)]
                         fn #validate_id_rec(value: &#ty) -> bool {
-                            Self::#validate_id(value)
+                            #validate_rec_inner
                         }
                     }
                 };
@@ -120,26 +132,44 @@ impl StructSpec {
                     quote! {#(#attrs)* #field: #ty},
                     quote! {#id: #ty},
                     quote! {#field: #id},
-                    quote! {
-                        #[inline(always)]
-                        pub fn #id(&self) -> & #ty {
-                            &self.#field
-                        }
-                        #[allow(clippy::ptr_arg)]
-                        pub fn #validate_id(value: &#ty) -> bool {
-                            #predicate
-                        }
-                        #validate_id_rec_impl
-                        pub fn #set_id(&mut self, mut value: #ty) -> Result<#ty, #ty> {
-                            if Self::#validate_id(&value) {
+                    match &predicate {
+                        Some(predicate) => quote! {
+                            #[inline(always)]
+                            #(#doc_attrs)*
+                            pub fn #id(&self) -> & #ty {
+                                &self.#field
+                            }
+                            #[allow(clippy::ptr_arg)]
+                            pub fn #validate_id(value: &#ty) -> bool {
+                                #predicate
+                            }
+                            #validate_id_rec_impl
+                            #(#doc_attrs)*
+                            pub fn #set_id(&mut self, mut value: #ty) -> Result<#ty, #ty> {
+                                if Self::#validate_id(&value) {
+                                    std::mem::swap(&mut self.#field, &mut value);
+                                    Ok(value)
+                                } else {
+                                    Err(value)
+                                }
+                            }
+                        },
+                        None => quote! {
+                            #[inline(always)]
+                            #(#doc_attrs)*
+                            pub fn #id(&self) -> & #ty {
+                                &self.#field
+                            }
+                            #validate_id_rec_impl
+                            #(#doc_attrs)*
+                            pub fn #set_id(&mut self, mut value: #ty) -> Result<#ty, #ty> {
                                 std::mem::swap(&mut self.#field, &mut value);
                                 Ok(value)
-                            } else {
-                                Err(value)
                             }
-                        }
-                    },
-                    quote! {Self::#validate_id(self.#id())},
+                        },
+                    }
+                    ,
+                    if predicate.is_some() {Some(quote! {Self::#validate_id(self.#id())})} else {None},
                     quote! {Self::#validate_id_rec(self.#id())},
                     match f.ty {
                         FieldType::Concrete(_) => 
@@ -196,11 +226,13 @@ impl StructSpec {
                     use std::any::Any;
                     match key.split_once(#SEPARATOR).unwrap_or((key, "")) {
                         #(#get_match)*
+                        ("", key) if !key.is_empty() => self.get(key),
                         _ => Err(validated_struct::GetError::NoMatchingKey),
                     }
                 }
             }
         });
+        let constructor_validations = constructor_validations.into_iter().filter_map(|x|x).collect::<Vec<_>>();
         quote! {
             #(#sattrs)*
             pub struct #ident {

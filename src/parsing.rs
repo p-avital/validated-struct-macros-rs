@@ -66,6 +66,7 @@ impl Parse for RecursionMarker {
         Ok(Self)
     }
 }
+
 #[derive(Default)]
 struct Attrs {
     local: Vec<Attribute>,
@@ -75,7 +76,7 @@ impl Parse for Attrs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut s = Self::default();
         let mut recursive = false;
-        for _ in 0..10000 {
+        for _ in 0..1000000 {
             if RecursionMarker::atomic_parse(input).is_ok() {
                 recursive = true;
                 continue;

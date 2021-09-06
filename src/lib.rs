@@ -213,6 +213,7 @@ impl StructSpec {
                 fn validate_rec(&self) -> bool {
                     true #(&& #constructor_rec_validations)*
                 }
+                #[allow(clippy::too_many_arguments)]
                 pub fn new(#(#args),*) -> Result<Self, Self> {
                     let constructed = #ident {
                         #(#associations),*

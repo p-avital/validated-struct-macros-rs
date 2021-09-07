@@ -11,6 +11,7 @@ impl Parse for FieldType {
 impl Parse for FieldSpec {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let attributes = input.call(Attribute::parse_outer)?;
+        let vis = input.parse()?;
         let ident = input.parse()?;
         input.parse::<Token![:]>()?;
         let ty = input.parse()?;
@@ -24,6 +25,7 @@ impl Parse for FieldSpec {
         };
         Ok(FieldSpec {
             attributes,
+            vis,
             ident,
             ty,
             constraint,

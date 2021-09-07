@@ -2,12 +2,7 @@ use std::mem::MaybeUninit;
 
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{
-    parenthesized,
-    parse::{Parse, ParseStream},
-    punctuated::Punctuated,
-    Attribute, Expr, Ident, Token,
-};
+use syn::{Attribute, Expr, Ident, Token, Visibility, parenthesized, parse::{Parse, ParseStream}, punctuated::Punctuated};
 
 #[derive(Clone)]
 enum FieldType {
@@ -26,6 +21,7 @@ impl FieldType {
 #[derive(Clone)]
 struct FieldSpec {
     attributes: Vec<Attribute>,
+    vis: Visibility,
     ident: Ident,
     ty: FieldType,
     constraint: Option<Expr>,
@@ -93,6 +89,7 @@ impl StructSpec {
                 let id = &f.ident;
                 let field = id;//quote::format_ident!("_{}", id);
                 let ty = f.ty.ty();
+                let vis = &f.vis;
                 let predicate = f
                     .constraint
                     .as_ref()
@@ -129,7 +126,7 @@ impl StructSpec {
                     }
                 };
                 (
-                    quote! {#(#attrs)* #field: #ty},
+                    quote! {#(#attrs)* #vis #field: #ty},
                     quote! {#id: #ty},
                     quote! {#field: #id},
                     match &predicate {
@@ -232,7 +229,7 @@ impl StructSpec {
                 }
             }
         });
-        let constructor_validations = constructor_validations.into_iter().filter_map(|x|x).collect::<Vec<_>>();
+        let constructor_validations = constructor_validations.into_iter().flatten().collect::<Vec<_>>();
         quote! {
             #(#sattrs)*
             pub struct #ident {

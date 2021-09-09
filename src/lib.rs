@@ -68,7 +68,7 @@ impl StructSpec {
     }
     fn structure(&self) -> impl quote::ToTokens {
         const SEPARATOR: char = if cfg!(feature = "dot_separator") {'.'} else {'/'};
-        unzip_n::unzip_n!(8);
+        unzip_n::unzip_n!(9);
         let ident = &self.ident;
         let sattrs = &self.attrs;
         let (
@@ -79,7 +79,8 @@ impl StructSpec {
             constructor_validations,
             constructor_rec_validations,
             serde_match,
-            get_match
+            get_match,
+            get_keys
         ) = self
             .fields
             .iter()
@@ -184,6 +185,13 @@ impl StructSpec {
                             (#str_id, key) => self.#field.get(key),
                         },
                     },
+                    match f.ty {
+                        FieldType::Concrete(_) => quote!{keys.push(#str_id.into());},
+                        FieldType::Structure(_) => quote!{
+                            keys.push(#str_id.into());
+                            keys.extend(self.#field.keys().into_iter().map(|s|format!("{}{}{}",#str_id, #SEPARATOR, s.as_str())));
+                        },
+                    }
                 )
             })
             .collect::<Vec<_>>()
@@ -226,6 +234,12 @@ impl StructSpec {
                         ("", key) if !key.is_empty() => self.get(key),
                         _ => Err(validated_struct::GetError::NoMatchingKey),
                     }
+                }
+                type Keys = std::vec::Vec<String>;
+                fn keys(&self) -> Self::Keys {
+                    let mut keys = std::vec::Vec::new();
+                    #(#get_keys)*
+                    keys
                 }
             }
         });

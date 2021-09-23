@@ -32,42 +32,6 @@ impl Parse for FieldSpec {
         })
     }
 }
-trait AtomicParse: Sized {
-    fn atomic_parse(input: ParseStream) -> syn::Result<Self>;
-}
-impl AtomicParse for RecursionMarker {
-    fn atomic_parse(input: ParseStream) -> syn::Result<Self> {
-        RecursionMarker::parse(&input.fork())?;
-        RecursionMarker::parse(input)
-    }
-}
-impl AtomicParse for Attribute {
-    fn atomic_parse(input: ParseStream) -> syn::Result<Self> {
-        let content;
-        let pound_token = input.parse()?;
-        let style = syn::AttrStyle::Outer;
-        let bracket_token = syn::bracketed!(content in input);
-        let path = content.call(syn::Path::parse_mod_style)?;
-        let tokens = content.parse()?;
-        Ok(Attribute {
-            pound_token,
-            style,
-            bracket_token,
-            path,
-            tokens,
-        })
-    }
-}
-struct RecursionMarker;
-impl Parse for RecursionMarker {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        input.parse::<Token![#]>()?;
-        let content;
-        syn::bracketed!(content in input);
-        content.parse::<kw::recursive_attrs>()?;
-        Ok(Self)
-    }
-}
 
 #[derive(Default)]
 struct Attrs {
@@ -76,25 +40,19 @@ struct Attrs {
 }
 impl Parse for Attrs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut s = Self::default();
-        let mut recursive = false;
-        for _ in 0..1000000 {
-            if RecursionMarker::atomic_parse(input).is_ok() {
-                recursive = true;
-                continue;
-            }
-            match Attribute::atomic_parse(input) {
-                Ok(attr) => {
-                    if recursive {
-                        s.recursive.push(attr)
-                    } else {
-                        s.local.push(attr)
-                    }
-                }
-                Err(_) => return Ok(s),
-            }
+        let mut local = input.call(Attribute::parse_outer)?;
+        let split = local
+            .iter()
+            .position(|a| a.path.is_ident("recursive_attrs"));
+        let recursive = if let Some(split) = split {
+            local.split_off(split + 1)
+        } else {
+            Vec::new()
+        };
+        if split.is_some() {
+            local.pop();
         }
-        Ok(s)
+        Ok(Attrs { local, recursive })
     }
 }
 impl Parse for StructSpec {

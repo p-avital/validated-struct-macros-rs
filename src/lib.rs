@@ -235,7 +235,7 @@ fn serde_access(
             fn insert<'d, D: serde::Deserializer<'d>>(&mut self, key: &str, value: D) -> Result<(), validated_struct::InsertionError>
             where
                 validated_struct::InsertionError: From<D::Error> {
-                if let Some(e) = match key.split_once(#SEPARATOR).unwrap_or((key, "")) {
+                if let Some(e) = match validated_struct::split_once(key, #SEPARATOR) {
                     #(#serde_match)*
                     _ => Some("unknown key".into())
                 } {return Err(e)};
@@ -243,7 +243,7 @@ fn serde_access(
             }
             fn get<'a>(&'a self, key: &str) -> Result<&dyn std::any::Any, validated_struct::GetError>{
                 use std::any::Any;
-                match key.split_once(#SEPARATOR).unwrap_or((key, "")) {
+                match validated_struct::split_once(key, #SEPARATOR) {
                     #(#get_match)*
                     ("", key) if !key.is_empty() => self.get(key),
                     _ => Err(validated_struct::GetError::NoMatchingKey),

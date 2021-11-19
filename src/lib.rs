@@ -27,13 +27,20 @@ impl FieldType {
 #[derive(Clone)]
 struct FieldSpec {
     attributes: Vec<Attribute>,
+    is_validated_map: bool,
     vis: Visibility,
     ident: Ident,
     ty: FieldType,
     constraint: Option<Expr>,
 }
-mod kw {
-    syn::custom_keyword!(recursive_attrs);
+impl FieldSpec {
+    fn recursive_accessors(&self) -> bool {
+        if let FieldType::Structure(_) = &self.ty {
+            true
+        } else {
+            self.is_validated_map
+        }
+    }
 }
 #[derive(Clone)]
 struct StructSpec {
@@ -331,12 +338,14 @@ fn get_match(
     str_id: &str,
     field: &Ident,
 ) -> proc_macro2::TokenStream {
-    match spec.ty {
-        FieldType::Concrete(_) => quote! {(#str_id, "") => Ok(self.#id() as &dyn Any),},
-        FieldType::Structure(_) => quote! {
-            (#str_id, "") => Ok(self.#id() as &dyn Any),
+    let get_exact = quote! {(#str_id, "") => Ok(self.#id() as &dyn Any),};
+    if spec.recursive_accessors() {
+        quote! {
+            #get_exact
             (#str_id, key) => self.#field.get(key),
-        },
+        }
+    } else {
+        get_exact
     }
 }
 
@@ -348,14 +357,16 @@ fn serde_match(
     field: &Ident,
 ) -> proc_macro2::TokenStream {
     let serde_set_err = format!("Predicate rejected value for {}", id);
-    match spec.ty {
-        FieldType::Concrete(_) => {
-            quote! {(#str_id, "") => self.#set_id(serde::Deserialize::deserialize(value)?).is_err().then(||#serde_set_err.into()),}
-        }
-        FieldType::Structure(_) => quote! {
-            (#str_id, "") => self.#set_id(serde::Deserialize::deserialize(value)?).is_err().then(||#serde_set_err.into()),
+    let set_exact = quote! {
+        (#str_id, "") => self.#set_id(serde::Deserialize::deserialize(value)?).is_err().then(||#serde_set_err.into()),
+    };
+    if spec.recursive_accessors() {
+        quote! {
+            #set_exact
             (#str_id, key) => self.#field.insert(key, value).err(),
-        },
+        }
+    } else {
+        set_exact
     }
 }
 

@@ -1,4 +1,19 @@
 use super::*;
+
+mod kw {
+    syn::custom_keyword!(recursive_accessors);
+}
+
+enum FieldAttributes {
+    RecurseAccessors,
+}
+impl Parse for FieldAttributes {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        input.parse::<kw::recursive_accessors>()?;
+        Ok(Self::RecurseAccessors)
+    }
+}
+
 impl Parse for FieldType {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let fork = input.fork();
@@ -10,7 +25,24 @@ impl Parse for FieldType {
 }
 impl Parse for FieldSpec {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let attributes = input.call(Attribute::parse_outer)?;
+        let mut attributes = input.call(Attribute::parse_outer)?;
+        let mut is_validated_map = false;
+        attributes = attributes
+            .into_iter()
+            .filter(|attr| {
+                if attr.path.is_ident("validated") {
+                    match attr.parse_args::<FieldAttributes>() {
+                        Ok(args) => match args {
+                            FieldAttributes::RecurseAccessors => is_validated_map = true,
+                        },
+                        Err(e) => panic!("{}", e),
+                    };
+                    false
+                } else {
+                    true
+                }
+            })
+            .collect();
         let vis = input.parse()?;
         let ident = input.parse()?;
         input.parse::<Token![:]>()?;
@@ -25,6 +57,7 @@ impl Parse for FieldSpec {
         };
         Ok(FieldSpec {
             attributes,
+            is_validated_map,
             vis,
             ident,
             ty,

@@ -90,14 +90,16 @@ impl Parse for Attrs {
 }
 impl Parse for StructSpec {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let content;
+        let visibility: Visibility = input.parse()?;
         let Attrs {
             local: attrs,
             recursive: recursive_attrs,
         } = input.parse()?;
         let ident = input.parse()?;
+        let content;
         syn::braced!(content in input);
         Ok(StructSpec {
+            visibility,
             attrs,
             recursive_attrs,
             ident,

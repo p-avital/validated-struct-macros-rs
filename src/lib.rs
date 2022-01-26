@@ -44,6 +44,7 @@ impl FieldSpec {
 }
 #[derive(Clone)]
 struct StructSpec {
+    visibility: Visibility,
     attrs: Vec<Attribute>,
     recursive_attrs: Vec<Attribute>,
     ident: Ident,

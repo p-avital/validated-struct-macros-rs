@@ -86,7 +86,7 @@ impl StructSpec {
         list
     }
     fn structure(&self) -> impl quote::ToTokens {
-        unzip_n::unzip_n!(9);
+        unzip_n::unzip_n!(10);
         let ident = &self.ident;
         let mut notifying = false;
         let sattrs: Vec<_> = self
@@ -110,6 +110,7 @@ impl StructSpec {
             constructor_rec_validations,
             serde_match,
             get_match,
+            json_get_match,
             get_keys,
         ) = self
             .fields
@@ -145,6 +146,7 @@ impl StructSpec {
                     quote! {Self::#validate_id_rec(self.#id())},
                     serde_match(id, spec, &str_id, set_id, field_name),
                     get_match(spec, id, &str_id, field_name),
+                    json_get_match(spec, id, &str_id, field_name),
                     keys_match(spec, field_name, &str_id),
                 )
             })
@@ -344,6 +346,23 @@ fn get_match(
         quote! {
             #get_exact
             (#str_id, key) => self.#field.get(key),
+        }
+    } else {
+        get_exact
+    }
+}
+
+fn json_get_match(
+    spec: &FieldSpec,
+    id: &Ident,
+    str_id: &str,
+    field: &Ident,
+) -> proc_macro2::TokenStream {
+    let get_exact = quote! {(#str_id, "") => serde_json::to_string(self.#id()),};
+    if spec.recursive_accessors() {
+        quote! {
+            #get_exact
+            (#str_id, key) => self.#field.json_get(key),
         }
     } else {
         get_exact

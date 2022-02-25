@@ -1,6 +1,6 @@
 [package]
 name = "validated_struct_macros"
-version = "0.1.10"
+version = "0.1.12"
 edition = "2018"
 authors = ["Pierre Avital <pierre.avital@me.com>"]
 description = "Macros for validated_struct"
@@ -11,6 +11,7 @@ repository = "https://github.com/p-avital/validated-struct-macros-rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 serde = []
+serde_json = []
 dot_separator = []
 
 [dependencies]

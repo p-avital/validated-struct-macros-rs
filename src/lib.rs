@@ -153,7 +153,8 @@ impl StructSpec {
             .collect::<Vec<_>>()
             .into_iter()
             .unzip_n_vec();
-        let serde_access = serde_access(ident, &serde_match, &get_match, &get_keys);
+        let serde_access =
+            serde_access(ident, &serde_match, &get_match, &get_keys, &json_get_match);
         let constructor_validations = constructor_validations
             .into_iter()
             .flatten()
@@ -220,7 +221,20 @@ fn serde_access(
     serde_match: &[proc_macro2::TokenStream],
     get_match: &[proc_macro2::TokenStream],
     get_keys: &[proc_macro2::TokenStream],
+    json_get_match: &[proc_macro2::TokenStream],
 ) -> Option<proc_macro2::TokenStream> {
+    let get_json = cfg!(feature = "serde_json").then(|| {
+        quote! {
+            fn get_json(& self, key: &str) -> Result<String, validated_struct::GetError>{
+                use std::any::Any;
+                match validated_struct::split_once(key, #SEPARATOR) {
+                    #(#json_get_match)*
+                    ("", key) if !key.is_empty() => self.get_json(key),
+                    _ => Err(validated_struct::GetError::NoMatchingKey),
+                }
+            }
+        }
+    });
     cfg!(feature = "serde").then(|| quote! {
         impl #ident {
             pub fn from_deserializer<'d, D: serde::Deserializer<'d>>(
@@ -259,6 +273,7 @@ fn serde_access(
                     _ => Err(validated_struct::GetError::NoMatchingKey),
                 }
             }
+            #get_json
             type Keys = std::vec::Vec<String>;
             fn keys(&self) -> Self::Keys {
                 let mut keys = std::vec::Vec::new();
@@ -358,11 +373,11 @@ fn json_get_match(
     str_id: &str,
     field: &Ident,
 ) -> proc_macro2::TokenStream {
-    let get_exact = quote! {(#str_id, "") => serde_json::to_string(self.#id()),};
+    let get_exact = quote! {(#str_id, "") => serde_json::to_string(self.#id()).map_err(|e| validated_struct::GetError::Other(e.into())),};
     if spec.recursive_accessors() {
         quote! {
             #get_exact
-            (#str_id, key) => self.#field.json_get(key),
+            (#str_id, key) => self.#field.get_json(key),
         }
     } else {
         get_exact

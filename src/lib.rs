@@ -256,6 +256,9 @@ fn serde_access(
                 }
             }
         }
+        impl<'a> validated_struct::ValidatedMapAssociatedTypes<'a> for #ident {
+            type Accessor = &'a dyn std::any::Any;
+        }
         impl validated_struct::ValidatedMap for #ident {
             fn insert<'d, D: serde::Deserializer<'d>>(&mut self, key: &str, value: D) -> Result<(), validated_struct::InsertionError>
             where

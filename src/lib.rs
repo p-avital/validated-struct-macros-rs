@@ -265,6 +265,7 @@ fn serde_access(
                 validated_struct::InsertionError: From<D::Error> {
                 if let Some(e) = match validated_struct::split_once(key, #SEPARATOR) {
                     #(#serde_match)*
+                    ("", key) if !key.is_empty() => self.insert(key, value).err(),
                     _ => Some("unknown key".into())
                 } {return Err(e)};
                 Ok(())

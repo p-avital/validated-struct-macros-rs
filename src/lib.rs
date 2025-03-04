@@ -94,7 +94,7 @@ impl StructSpec {
             .attrs
             .iter()
             .filter_map(|a| {
-                if a.path.is_ident("notifying") {
+                if a.path().is_ident("notifying") {
                     notifying = true;
                     None
                 } else {
@@ -302,7 +302,7 @@ fn accessors(
     let doc_attrs: Vec<_> = spec
         .attributes
         .iter()
-        .filter(|&attr| attr.path.is_ident("doc"))
+        .filter(|&attr| attr.path().is_ident("doc"))
         .cloned()
         .collect();
     let validate_id_rec_impl =

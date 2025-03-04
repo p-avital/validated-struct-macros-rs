@@ -27,22 +27,19 @@ impl Parse for FieldSpec {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut attributes = input.call(Attribute::parse_outer)?;
         let mut is_validated_map = false;
-        attributes = attributes
-            .into_iter()
-            .filter(|attr| {
-                if attr.path.is_ident("validated") {
-                    match attr.parse_args::<FieldAttributes>() {
-                        Ok(args) => match args {
-                            FieldAttributes::RecurseAccessors => is_validated_map = true,
-                        },
-                        Err(e) => panic!("{}", e),
-                    };
-                    false
-                } else {
-                    true
-                }
-            })
-            .collect();
+        attributes.retain(|attr| {
+            if attr.path().is_ident("validated") {
+                match attr.parse_args::<FieldAttributes>() {
+                    Ok(args) => match args {
+                        FieldAttributes::RecurseAccessors => is_validated_map = true,
+                    },
+                    Err(e) => panic!("{}", e),
+                };
+                false
+            } else {
+                true
+            }
+        });
         let vis = input.parse()?;
         let ident = input.parse()?;
         input.parse::<Token![:]>()?;
@@ -76,7 +73,7 @@ impl Parse for Attrs {
         let mut local = input.call(Attribute::parse_outer)?;
         let split = local
             .iter()
-            .position(|a| a.path.is_ident("recursive_attrs"));
+            .position(|a| a.path().is_ident("recursive_attrs"));
         let recursive = if let Some(split) = split {
             local.split_off(split + 1)
         } else {
@@ -103,7 +100,7 @@ impl Parse for StructSpec {
             attrs,
             recursive_attrs,
             ident,
-            fields: content.parse_terminated(FieldSpec::parse)?,
+            fields: content.parse_terminated(FieldSpec::parse, Token![,])?,
         })
     }
 }

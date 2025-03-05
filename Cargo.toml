@@ -1,6 +1,6 @@
 [package]
 name = "validated_struct_macros"
-version = "2.1.0"
+version = "2.1.1"
 edition = "2018"
 authors = ["Pierre Avital <pierre.avital@me.com>"]
 description = "Macros for validated_struct"

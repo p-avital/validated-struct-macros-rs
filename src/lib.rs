@@ -1,5 +1,4 @@
 #![allow(clippy::too_many_arguments)]
-use std::mem::MaybeUninit;
 
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
@@ -56,31 +55,25 @@ const SEPARATOR: char = if cfg!(feature = "dot_separator") {
 } else {
     '/'
 };
+
 impl StructSpec {
     fn flatten_go(
-        mut self,
+        &mut self,
         list: &mut Vec<Self>,
         recursive_attrs: &mut Vec<Vec<Attribute>>,
-    ) -> Self {
-        let mut self_rec_attrs = Vec::new();
-        std::mem::swap(&mut self_rec_attrs, &mut self.recursive_attrs);
+    ) {
+        let self_rec_attrs = std::mem::take(&mut self.recursive_attrs);
         recursive_attrs.push(self_rec_attrs);
         self.attrs.extend(recursive_attrs.iter().flatten().cloned());
         for field in self.fields.iter_mut() {
             if let FieldType::Structure(s) = &mut field.ty {
-                let mut tmp = MaybeUninit::uninit();
-                std::mem::swap(s, unsafe { &mut *tmp.as_mut_ptr() });
-                tmp = MaybeUninit::new(
-                    unsafe { tmp.assume_init() }.flatten_go(list, recursive_attrs),
-                );
-                std::mem::swap(s, unsafe { &mut *tmp.as_mut_ptr() });
+                s.flatten_go(list, recursive_attrs);
             }
         }
         recursive_attrs.pop();
         list.push(self.clone());
-        self
     }
-    fn flatten(self) -> Vec<Self> {
+    fn flatten(mut self) -> Vec<Self> {
         let mut list = Vec::with_capacity(1);
         let mut rec_attrs = Vec::with_capacity(1);
         self.flatten_go(&mut list, &mut rec_attrs);
